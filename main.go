@@ -5,27 +5,80 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"time"
 )
 
-func setConfig(nsqAddr string, lookupdPort int, lookupdIPs []net.IP) {
-	lookupdTCPAddrs := []string{}
-	for _, IP := range lookupdIPs {
-		addr := fmt.Sprintf("%s:%d", IP, lookupdPort)
-		lookupdTCPAddrs = append(lookupdTCPAddrs, addr)
+// test equality between two arrays
+func eq(a []string, b []string) bool {
+	if len(a) != len(b) {
+		return false
 	}
+	for _, v := range a {
+		if !contains(b, v) {
+			return false
+		}
+	}
+	return true
+}
 
-	body, err := json.Marshal(lookupdTCPAddrs)
+func contains(s []string, e string) bool {
+    for _, a := range s {
+        if a == e {
+            return true
+        }
+    }
+    return false
+}
+
+// get the current lookupd IPs from nsqd config
+func getConfgIPs(configAddr string) []string {
+	res, err := http.Get(configAddr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("setting lookupdTCPAddrs: %s", body)
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	configAddr := "http://" + nsqAddr + "/config/nsqlookupd_tcp_addresses"
+	configIPs := []string{}
+	json.Unmarshal(body, &configIPs)
+
+	return configIPs
+}
+
+// get lookupd IPs from DNS
+func getLookupdIPs(dnsAddr *string, port *int) []string {
+	addrs := []string{}
+
+	IPs, err := net.LookupIP(*dnsAddr)
+	if err != nil {
+		// log warning...
+		return addrs
+	}
+
+	for _, IP := range IPs {
+		addr := fmt.Sprintf("%s:%d", IP, *port)
+		addrs = append(addrs, addr)
+	}
+
+	return addrs
+}
+
+// set lookupd addrs on nsqd
+func setConfig(configAddr string, lookupdAddrs []string) {
+	body, err := json.Marshal(lookupdAddrs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("setting lookupd addresses to %s", body)
+
 	req, err := http.NewRequest("PUT", configAddr, bytes.NewBuffer(body))
 	if err != nil {
 		log.Fatalf("http.NewRequest error: %s", err)
@@ -45,42 +98,40 @@ func setConfig(nsqAddr string, lookupdPort int, lookupdIPs []net.IP) {
 func main() {
 	var (
 		lookupdPort = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd tcp port")
-		dnsAddr  = flag.String("lookupd-dns-address", "", "The DNS address of nsqlookupd")
-		nsqdAddr = flag.String("nsqd-http-address", "0.0.0.0:4151", "The HTTP address of nsqd")
+		dnsAddr     = flag.String("lookupd-dns-address", "", "The DNS address of nsqlookupd")
+		nsqdAddr    = flag.String("nsqd-http-address", "0.0.0.0:4151", "The HTTP address of nsqd")
 	)
 	flag.Parse()
 
+	configAddr := "http://" + *nsqdAddr + "/config/nsqlookupd_tcp_addresses"
+
 	if *dnsAddr == "" {
-		fmt.Println("Error: required arg -lookupd-dns-address")
-		return
+		log.Fatal("arg -lookupd-dns-address is required")
 	}
 
-	lookupdIPs, err := net.LookupIP(*dnsAddr)
-	if err != nil {
-		log.Fatalf("net.LookupIP error: %s", err)
-	}
-
+	lookupdIPs := getLookupdIPs(dnsAddr, lookupdPort)
 	if len(lookupdIPs) == 0 {
 		log.Fatalf("no IPs found for %s", *dnsAddr)
 	}
 
-	setConfig(*nsqdAddr, *lookupdPort, lookupdIPs)
+	setConfig(configAddr, lookupdIPs)
 	ticker := time.Tick(15 * time.Second)
-
 	for {
 		select {
 		case <-ticker:
-			lookupdIPs, err := net.LookupIP(*dnsAddr)
-			if err != nil {
-				log.Fatal(err)
-			}
-
+			lookupdIPs = getLookupdIPs(dnsAddr, lookupdPort)
 			if len(lookupdIPs) == 0 {
-				log.Printf("No IP addresses found for %s", *dnsAddr)
+				log.Printf("no addresses found for %s", *dnsAddr)
 				continue
 			}
 
-			setConfig(*nsqdAddr, *lookupdPort, lookupdIPs)
+			configIPs := getConfgIPs(configAddr)
+			if eq(lookupdIPs, configIPs) {
+				log.Println("nsqd is in sync with dns addresses")
+				continue
+			}
+
+			setConfig(configAddr, lookupdIPs)
 		}
 	}
 }
