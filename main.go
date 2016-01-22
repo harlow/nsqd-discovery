@@ -26,40 +26,39 @@ func eq(a []string, b []string) bool {
 }
 
 func contains(s []string, e string) bool {
-    for _, a := range s {
-        if a == e {
-            return true
-        }
-    }
-    return false
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 // get the current lookupd IPs from nsqd config
-func getConfgIPs(configAddr string) []string {
+func getConfgIPs(configAddr string) ([]string, error) {
+	configIPs := []string{}
+
 	res, err := http.Get(configAddr)
 	if err != nil {
-		log.Fatal(err)
+		return configIPs, err
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		return configIPs, err
 	}
 
-	configIPs := []string{}
 	json.Unmarshal(body, &configIPs)
-
-	return configIPs
+	return configIPs, nil
 }
 
 // get lookupd IPs from DNS
-func getLookupdIPs(dnsAddr *string, port *int) []string {
+func getLookupdIPs(dnsAddr *string, port *int) ([]string, error) {
 	addrs := []string{}
 
 	IPs, err := net.LookupIP(*dnsAddr)
 	if err != nil {
-		// log warning...
-		return addrs
+		return addrs, err
 	}
 
 	for _, IP := range IPs {
@@ -67,32 +66,34 @@ func getLookupdIPs(dnsAddr *string, port *int) []string {
 		addrs = append(addrs, addr)
 	}
 
-	return addrs
+	return addrs, nil
 }
 
 // set lookupd addrs on nsqd
-func setConfig(configAddr string, lookupdAddrs []string) {
+func setConfig(configAddr string, lookupdAddrs []string) error {
 	body, err := json.Marshal(lookupdAddrs)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	log.Printf("setting lookupd addresses to %s", body)
+	log.Printf("type=info func=setConfig ips=%s", body)
 
 	req, err := http.NewRequest("PUT", configAddr, bytes.NewBuffer(body))
 	if err != nil {
-		log.Fatalf("http.NewRequest error: %s", err)
+		return err
 	}
 
 	client := &http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		log.Fatalf("client.Do error: %s", err)
+		return err
 	}
 
 	if res.StatusCode != 200 {
-		log.Printf("nsqd responded with status: %d", res.StatusCode)
+		log.Printf("type=error func=setConfig status=%d", res.StatusCode)
 	}
+
+	return nil
 }
 
 func main() {
@@ -109,29 +110,50 @@ func main() {
 		log.Fatal("arg -lookupd-dns-address is required")
 	}
 
-	lookupdIPs := getLookupdIPs(dnsAddr, lookupdPort)
-	if len(lookupdIPs) == 0 {
-		log.Fatalf("no IPs found for %s", *dnsAddr)
+	lookupdIPs, err := getLookupdIPs(dnsAddr, lookupdPort)
+	if err != nil {
+		log.Fatalf("type=error func=getLookupdIPs msg=%s", err)
 	}
 
-	setConfig(configAddr, lookupdIPs)
+	if len(lookupdIPs) == 0 {
+		log.Printf("type=warn msg=%s addr=%s", "no dns records", *dnsAddr)
+	}
+
+	err = setConfig(configAddr, lookupdIPs)
+	if err != nil {
+		log.Printf("type=error func=setConfig msg=%s", err)
+	}
+
 	ticker := time.Tick(15 * time.Second)
 	for {
 		select {
 		case <-ticker:
-			lookupdIPs = getLookupdIPs(dnsAddr, lookupdPort)
+			lookupdIPs, err = getLookupdIPs(dnsAddr, lookupdPort)
+			if err != nil {
+				log.Printf("type=error func=getLookupdIPs msg=%s", err)
+			}
+
 			if len(lookupdIPs) == 0 {
-				log.Printf("no addresses found for %s", *dnsAddr)
+				log.Printf("type=warn msg=%s addr=%s", "no dns records", *dnsAddr)
 				continue
 			}
 
-			configIPs := getConfgIPs(configAddr)
+			configIPs, err := getConfgIPs(configAddr)
+			if err != nil {
+				log.Printf("type=error func=getConfgIPs msg=%s", err)
+				continue
+			}
+
 			if eq(lookupdIPs, configIPs) {
-				log.Println("nsqd is in sync with dns addresses")
+				log.Printf("type=info func=eq msg=%s", "config up to date")
 				continue
 			}
 
-			setConfig(configAddr, lookupdIPs)
+			err = setConfig(configAddr, lookupdIPs)
+			if err != nil {
+				log.Printf("type=error func=setConfig msg=%s", err)
+				continue
+			}
 		}
 	}
 }
