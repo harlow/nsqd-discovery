@@ -13,6 +13,6 @@ Dynamically configure nsqd with IP addresses from DNS record.
 
 ```
 docker run --rm -it harlow/nsqd-discovery \
-  -lookupd-dns-address $LOOKUPD_DNS_ADDRESS \
-  -nsqd-http-address $NSQD_HTTP_ADDRESS:4151
+  --lookupd-dns-address $LOOKUPD_DNS_ADDRESS \
+  --nsqd-http-address $NSQD_HTTP_ADDRESS:4151
 ```

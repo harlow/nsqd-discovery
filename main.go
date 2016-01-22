@@ -17,6 +17,8 @@ func setConfig(nsqAddr string, lookupdIPs []net.IP) {
 		log.Fatal(err)
 	}
 
+	log.Printf("setting lookupdIPs: %s", body)
+
 	configAddr := "http://" + nsqAddr + "/config"
 	req, err := http.NewRequest("PUT", configAddr, bytes.NewBuffer(body))
 	if err != nil {
