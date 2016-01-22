@@ -11,13 +11,19 @@ import (
 	"time"
 )
 
-func setConfig(nsqAddr string, lookupdIPs []net.IP) {
-	body, err := json.Marshal(lookupdIPs)
+func setConfig(nsqAddr string, lookupdPort int, lookupdIPs []net.IP) {
+	lookupdTCPAddrs := []string{}
+	for _, IP := range lookupdIPs {
+		addr := fmt.Sprintf("%s:%d", IP, lookupdPort)
+		lookupdTCPAddrs = append(lookupdTCPAddrs, addr)
+	}
+
+	body, err := json.Marshal(lookupdTCPAddrs)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("setting lookupdIPs: %s", body)
+	log.Printf("setting lookupdTCPAddrs: %s", body)
 
 	configAddr := "http://" + nsqAddr + "/config/nsqlookupd_tcp_addresses"
 	req, err := http.NewRequest("PUT", configAddr, bytes.NewBuffer(body))
@@ -38,6 +44,7 @@ func setConfig(nsqAddr string, lookupdIPs []net.IP) {
 
 func main() {
 	var (
+		lookupdPort = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd tcp port")
 		dnsAddr  = flag.String("lookupd-dns-address", "", "The DNS address of nsqlookupd")
 		nsqdAddr = flag.String("nsqd-http-address", "0.0.0.0:4151", "The HTTP address of nsqd")
 	)
@@ -57,7 +64,7 @@ func main() {
 		log.Fatalf("no IPs found for %s", *dnsAddr)
 	}
 
-	setConfig(*nsqdAddr, lookupdIPs)
+	setConfig(*nsqdAddr, *lookupdPort, lookupdIPs)
 	ticker := time.Tick(15 * time.Second)
 
 	for {
@@ -73,7 +80,7 @@ func main() {
 				continue
 			}
 
-			setConfig(*nsqdAddr, lookupdIPs)
+			setConfig(*nsqdAddr, *lookupdPort, lookupdIPs)
 		}
 	}
 }
