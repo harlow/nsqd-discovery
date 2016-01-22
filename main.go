@@ -26,9 +26,13 @@ func setConfig(nsqAddr string, lookupdIPs []net.IP) {
 	}
 
 	client := &http.Client{}
-	_, err = client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("client.Do error: %s", err)
+	}
+
+	if res.StatusCode != 200 {
+		log.Printf("nsqd responded with status: %d", res.StatusCode)
 	}
 }
 
