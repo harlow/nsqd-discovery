@@ -5,7 +5,7 @@ Dynamically configure nsqd with IP addresses from DNS record.
 ### Command Line Options
 
 ```
--lookupd-tcp-port=4160: <port> to provide A record with nsqlookupd IP Addresses
+-lookupd-tcp-port=4160: <port> the TCP port to connect to nsqlookupd
 -lookupd-dns-address=: <addr> to provide A record with nsqlookupd IP Addresses
 -nsqd-http-address="0.0.0.0:4151": <addr>:<port> of the nsqd to configure
 ```
