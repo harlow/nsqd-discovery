@@ -1,0 +1,1 @@
+docker run --rm -it -v "$GOPATH":/gopath -v "$(pwd)":/app -e "GOPATH=/gopath" -w /app golang:latest sh -c 'CGO_ENABLED=0 go build -a --installsuffix cgo --ldflags="-s" -o nsqd-discovery' && docker build -t harlow/nsqd-discovery .
