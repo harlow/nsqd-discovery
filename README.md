@@ -1,6 +1,15 @@
 # DNS config for NSQD
 
-Dynamically configure nsqd with IP address from DNS record.
+Dynamically configure nsqd with IP addresses from DNS record.
+
+## Command Line Options
+
+```
+-lookupd-dns-address=: <addr> to provide A record with nsqlookupd IP Addresses
+-nsqd-http-address="0.0.0.0:4151": <addr>:<port> of the nsqd to configure
+```
+
+## Run
 
 ```
 docker run --rm -it harlow/nsqd-discovery \
