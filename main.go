@@ -5,15 +5,13 @@ import (
 	"log"
 	"time"
 
-	"./dnscfg"
-	"./httpcfg"
+	"github.com/harlow/nsqd-discovery/dnscfg"
+	"github.com/harlow/nsqd-discovery/httpcfg"
 )
-
-
 
 func main() {
 	var (
-		ldPort 	= flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd tcp port")
+		ldPort  = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd tcp port")
 		dnsAddr = flag.String("lookupd-dns-address", "", "The DNS address of nsqlookupd")
 		cfgAddr = flag.String("config-http-address", "", "The IP address of config endpoint")
 	)
