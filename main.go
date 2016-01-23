@@ -17,16 +17,7 @@ var (
 
 func main() {
 	flag.Parse()
-
-	if *cfgAddr == "" {
-		log.Fatal("arg -lookupd-cfg-address is required")
-	}
-
-	if *dnsAddr == "" {
-		log.Fatal("arg -lookupd-dns-address is required")
-	}
-
-	cfgURL := "http://" + *cfgAddr + "/config/nsqlookupd_tcp_addresses"
+	ensureRequiredFlags()
 
 	IPs, err := dnscfg.Get(dnsAddr, ldPort)
 	if err != nil {
@@ -37,12 +28,27 @@ func main() {
 		log.Printf("type=warn msg=%s addr=%s", "no dns records", *dnsAddr)
 	}
 
+	cfgURL := "http://" + *cfgAddr + "/config/nsqlookupd_tcp_addresses"
+
 	err = httpcfg.Set(cfgURL, IPs)
 	if err != nil {
 		log.Printf("type=error msg=%s err=%s", "set config", err)
+	} else {
+		log.Printf("type=info msg=%s ips=%s", "set config", IPs)
 	}
 
 	configLoop(cfgURL)
+}
+
+// make sure the appropriate flags have been passed
+func ensureRequiredFlags() {
+	if *cfgAddr == "" {
+		log.Fatal("flag value not provided: --lookupd-cfg-address")
+	}
+
+	if *dnsAddr == "" {
+		log.Fatal("flag value not provided: --lookupd-dns-address")
+	}
 }
 
 // continue looking at dns entry for changes in config
