@@ -2,12 +2,20 @@
 
 Dynamically configure `nsqd` or `nsqadmin` with IP addresses from DNS A-record.
 
+### Set up
+
+1. Create a private zone in AWS Route 53
+2. Create a Record Set with an address
+3. Add an A record w/ a list of IP's for `nsqlookupd`
+
+Note: Step 3 should be automated. When `nsqlookupd` boots the IP should be automatcially added to the above A record.
+
 ### Command Line Options
 
 ```
+-config-http-address=: <addr>:<port> of the HTTP config endpoint
 -lookupd-dns-address=: <addr> of DNS A record that provides nsqlookupd IP Addresses
 -lookupd-tcp-port=4160: <port> of nsqlookupd TCP address
--config-http-address=: <addr>:<port> of the HTTP config endpoint
 ```
 
 ### Run
