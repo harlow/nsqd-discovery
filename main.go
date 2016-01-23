@@ -9,12 +9,13 @@ import (
 	"github.com/harlow/nsqd-discovery/httpcfg"
 )
 
+var (
+	ldPort  = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd TCP port")
+	dnsAddr = flag.String("lookupd-dns-address", "", "The nsqlookupd DNS entry")
+	cfgAddr = flag.String("config-http-address", "", "The config address")
+)
+
 func main() {
-	var (
-		ldPort  = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd tcp port")
-		dnsAddr = flag.String("lookupd-dns-address", "", "The DNS address of nsqlookupd")
-		cfgAddr = flag.String("config-http-address", "", "The IP address of config endpoint")
-	)
 	flag.Parse()
 
 	if *cfgAddr == "" {
@@ -27,25 +28,31 @@ func main() {
 
 	cfgURL := "http://" + *cfgAddr + "/config/nsqlookupd_tcp_addresses"
 
-	newIPs, err := dnscfg.Get(dnsAddr, ldPort)
+	IPs, err := dnscfg.Get(dnsAddr, ldPort)
 	if err != nil {
 		log.Fatalf("type=error msg=%s err=%s", "dns lookup", err)
 	}
 
-	if len(newIPs) == 0 {
+	if len(IPs) == 0 {
 		log.Printf("type=warn msg=%s addr=%s", "no dns records", *dnsAddr)
 	}
 
-	err = httpcfg.Set(cfgURL, newIPs)
+	err = httpcfg.Set(cfgURL, IPs)
 	if err != nil {
 		log.Printf("type=error msg=%s err=%s", "set config", err)
 	}
 
+	configLoop(cfgURL)
+}
+
+// continue looking at dns entry for changes in config
+func configLoop(cfgURL string) {
 	ticker := time.Tick(15 * time.Second)
+
 	for {
 		select {
 		case <-ticker:
-			newIPs, err = dnscfg.Get(dnsAddr, ldPort)
+			newIPs, err := dnscfg.Get(dnsAddr, ldPort)
 			if err != nil {
 				log.Printf("type=error msg=%s err=%s", "dns lookup", err)
 				continue
