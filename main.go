@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -19,42 +21,10 @@ var (
 )
 
 func main() {
-	log.SetHandler(text.New(os.Stderr))
 	flag.Parse()
-	ensureRequiredFlags()
 
-	ctx := log.WithFields(log.Fields{
-		"cfgAddr": *cfgAddr,
-		"dnsAddr": *dnsAddr,
-		"ldPort":  *ldPort,
-	})
-
-	IPs, err := dnscfg.Get(dnsAddr, ldPort)
-	if err != nil {
-		ctx.WithError(err).Error("dns lookup")
-		os.Exit(1)
-	}
-
-	if len(IPs) == 0 {
-		ctx.Error("no ips found")
-	}
-
-	cfgURL := "http://" + *cfgAddr + "/config/nsqlookupd_tcp_addresses"
-
-	err = httpcfg.Set(cfgURL, IPs)
-	if err != nil {
-		ctx.WithError(err).Error("setting config")
-	} else {
-		ctx.WithField("ips", IPs).Info("setting config")
-	}
-
-	configLoop(ctx, cfgURL)
-}
-
-// make sure the appropriate flags have been passed
-func ensureRequiredFlags() {
 	if *cfgAddr == "" {
-		fmt.Println("required flag not provided: --lookupd-cfg-address")
+		fmt.Println("required flag not provided: --config-http-address")
 		os.Exit(1)
 	}
 
@@ -62,6 +32,36 @@ func ensureRequiredFlags() {
 		fmt.Println("required flag not provided: --lookupd-dns-address")
 		os.Exit(1)
 	}
+
+	log.SetHandler(text.New(os.Stderr))
+	ctx := log.WithFields(log.Fields{
+		"cfgAddr": *cfgAddr,
+		"dnsAddr": *dnsAddr,
+		"ldPort":  *ldPort,
+	})
+
+	ips, err := dnscfg.Get(dnsAddr, ldPort)
+	if err != nil {
+		ctx.WithError(err).Error("dns lookup")
+		os.Exit(1)
+	}
+
+	if len(ips) == 0 {
+		ctx.Error("no ip addresses found")
+		os.Exit(1)
+	}
+
+	cfgURL := "http://" + *cfgAddr + "/config/nsqlookupd_tcp_addresses"
+	err = httpcfg.Set(cfgURL, ips)
+	if err != nil {
+		ctx.WithError(err).Error("setting config")
+	} else {
+		ctx.WithField("ips", ips).Info("setting config")
+	}
+
+	go configLoop(ctx, cfgURL)
+
+	http.ListenAndServe(":6060", nil)
 }
 
 // continue looking at dns entry for changes in config
@@ -78,7 +78,7 @@ func configLoop(ctx log.Interface, cfgURL string) {
 			}
 
 			if len(newIPs) == 0 {
-				ctx.Warn("no ips found")
+				ctx.Error("no ip addresses found")
 				continue
 			}
 
