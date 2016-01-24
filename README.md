@@ -2,6 +2,8 @@
 
 Dynamically configure `nsqd` or `nsqadmin` with IP addresses from DNS A-record.
 
+Read more about [NSQD dynamic service discovery with DNS records](http://www.hward.com/nsqd-service-discovery-with-dns-records/).
+
 ### Set up
 
 1. Create a private zone in AWS Route 53
