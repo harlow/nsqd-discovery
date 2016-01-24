@@ -10,12 +10,13 @@ import (
 
 // Get the current lookupd addresses from config endpoint
 func Get(cfgURL string) ([]string, error) {
-	res, err := http.Get(cfgURL)
+	resp, err := http.Get(cfgURL)
 	if err != nil {
 		return []string{}, err
 	}
+	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return []string{}, err
 	}
@@ -38,13 +39,14 @@ func Set(cfgURL string, addrs []string) error {
 	}
 
 	client := &http.Client{}
-	res, err := client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 
-	if res.StatusCode != 200 {
-		return fmt.Errorf("type=error msg=unable to set config status=%d", res.StatusCode)
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("type=error msg=unable to set config status=%d", resp.StatusCode)
 	}
 
 	return nil
