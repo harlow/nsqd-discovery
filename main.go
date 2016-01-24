@@ -2,9 +2,12 @@ package main
 
 import (
 	"flag"
-	"log"
+	"fmt"
+	"os"
 	"time"
 
+	"github.com/apex/log"
+	"github.com/apex/log/handlers/text"
 	"github.com/harlow/nsqd-discovery/dnscfg"
 	"github.com/harlow/nsqd-discovery/httpcfg"
 )
@@ -16,43 +19,53 @@ var (
 )
 
 func main() {
+	log.SetHandler(text.New(os.Stderr))
 	flag.Parse()
 	ensureRequiredFlags()
 
+	ctx := log.WithFields(log.Fields{
+		"cfgAddr": *cfgAddr,
+		"dnsAddr": *dnsAddr,
+		"ldPort":  *ldPort,
+	})
+
 	IPs, err := dnscfg.Get(dnsAddr, ldPort)
 	if err != nil {
-		log.Fatalf("type=error msg=%s err=%s", "dns lookup", err)
+		ctx.WithError(err).Error("dns lookup")
+		os.Exit(1)
 	}
 
 	if len(IPs) == 0 {
-		log.Printf("type=warn msg=%s addr=%s", "no dns records", *dnsAddr)
+		ctx.Error("no ips found")
 	}
 
 	cfgURL := "http://" + *cfgAddr + "/config/nsqlookupd_tcp_addresses"
 
 	err = httpcfg.Set(cfgURL, IPs)
 	if err != nil {
-		log.Printf("type=error msg=%s err=%s", "set config", err)
+		ctx.WithError(err).Error("setting config")
 	} else {
-		log.Printf("type=info msg=%s ips=%s", "set config", IPs)
+		ctx.WithField("ips", IPs).Info("setting config")
 	}
 
-	configLoop(cfgURL)
+	configLoop(ctx, cfgURL)
 }
 
 // make sure the appropriate flags have been passed
 func ensureRequiredFlags() {
 	if *cfgAddr == "" {
-		log.Fatal("flag value not provided: --lookupd-cfg-address")
+		fmt.Println("required flag not provided: --lookupd-cfg-address")
+		os.Exit(1)
 	}
 
 	if *dnsAddr == "" {
-		log.Fatal("flag value not provided: --lookupd-dns-address")
+		fmt.Println("required flag not provided: --lookupd-dns-address")
+		os.Exit(1)
 	}
 }
 
 // continue looking at dns entry for changes in config
-func configLoop(cfgURL string) {
+func configLoop(ctx log.Interface, cfgURL string) {
 	ticker := time.Tick(15 * time.Second)
 
 	for {
@@ -60,33 +73,33 @@ func configLoop(cfgURL string) {
 		case <-ticker:
 			newIPs, err := dnscfg.Get(dnsAddr, ldPort)
 			if err != nil {
-				log.Printf("type=error msg=%s err=%s", "dns lookup", err)
+				ctx.WithError(err).Error("dns lookup")
 				continue
 			}
 
 			if len(newIPs) == 0 {
-				log.Printf("type=warn msg=%s addr=%s", "no dns records", *dnsAddr)
+				ctx.Warn("no ips found")
 				continue
 			}
 
 			oldIPs, err := httpcfg.Get(cfgURL)
 			if err != nil {
-				log.Printf("type=error msg=%s err=%s", "get config", err)
+				ctx.WithError(err).Error("getting config")
 				continue
 			}
 
 			if eq(newIPs, oldIPs) {
-				log.Printf("type=info msg=%s", "config up to date")
+				ctx.Info("config up to date")
 				continue
 			}
 
 			err = httpcfg.Set(cfgURL, newIPs)
 			if err != nil {
-				log.Printf("type=error msg=%s err=%s", "set config", err)
+				ctx.WithError(err).Error("setting config")
 				continue
 			}
 
-			log.Printf("type=info msg=%s ips=%s", "set config", newIPs)
+			ctx.WithField("ips", newIPs).Info("setting config")
 		}
 	}
 }
