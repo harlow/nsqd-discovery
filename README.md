@@ -26,9 +26,17 @@ docker run --rm -it harlow/nsqd-discovery \
   --config-http-address $CONFIG_HTTP_ADDRESS
 ```
 
-### Tiny Docker Image
+### Development
+
+After verifying the desired functionality build the docker image in preparation for deployment.
 
 The image is around ~5MB. Thanks to this [post from Travis Reeder](
 http://www.iron.io/blog/2015/07/an-easier-way-to-create-tiny-golang-docker-images.html).
 
-A build script has been included for convince.
+    make build
+
+### Deploy
+
+    make deploy
+
+
