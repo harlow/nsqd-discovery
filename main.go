@@ -43,12 +43,10 @@ func main() {
 	ips, err := dnscfg.Get(dnsAddr, ldPort)
 	if err != nil {
 		ctx.WithError(err).Error("dns lookup")
-		os.Exit(1)
 	}
 
 	if len(ips) == 0 {
 		ctx.Error("no ip addresses found")
-		os.Exit(1)
 	}
 
 	cfgURL := "http://" + *cfgAddr + "/config/nsqlookupd_tcp_addresses"
