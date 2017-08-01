@@ -1,6 +1,6 @@
 # DNS config for NSQD
 
-Dynamically configure `nsqd` with IP addresses from DNS A-record. Read more about [NSQ dynamic service discovery with DNS records](http://www.hward.com/nsqd-service-discovery-with-dns-records/).
+Dynamically configure `nsqd` with IP addresses from DNS A-record. Read more about [NSQ dynamic service discovery with DNS records](https://medium.com/@harlow/nsq-service-discovery-with-dns-records-de9d759db150).
 
 ### Set up
 
