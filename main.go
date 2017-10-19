@@ -15,9 +15,10 @@ import (
 )
 
 var (
-	ldPort  = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd TCP port")
-	dnsAddr = flag.String("lookupd-dns-address", "", "The nsqlookupd DNS entry")
-	cfgAddr = flag.String("config-http-address", "", "The config address")
+	ldPort      = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd TCP port")
+	dnsAddr     = flag.String("lookupd-dns-address", "", "The nsqlookupd DNS entry")
+	cfgAddr     = flag.String("config-http-address", "", "The config address")
+	httpAddrCfg = flag.Bool("config-addresses-as-http", false, "Config nsqlookupd http addresses")
 )
 
 func main() {
@@ -50,6 +51,10 @@ func main() {
 	}
 
 	cfgURL := "http://" + *cfgAddr + "/config/nsqlookupd_tcp_addresses"
+	if *httpAddrCfg {
+		cfgURL = "http://" + *cfgAddr + "/config/nsqlookupd_http_addresses"
+	}
+
 	err = httpcfg.Set(cfgURL, ips)
 	if err != nil {
 		ctx.WithError(err).Error("setting config")
