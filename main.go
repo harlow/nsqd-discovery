@@ -15,10 +15,11 @@ import (
 )
 
 var (
-	ldPort      = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd TCP port")
-	dnsAddr     = flag.String("lookupd-dns-address", "", "The nsqlookupd DNS entry")
-	cfgAddr     = flag.String("config-http-address", "", "The config address")
-	httpAddrCfg = flag.Bool("config-addresses-as-http", false, "Config nsqlookupd http addresses")
+	ldPort        = flag.Int("lookupd-tcp-port", 4160, "The nsqlookupd TCP port")
+	dnsAddr       = flag.String("lookupd-dns-address", "", "The nsqlookupd DNS entry")
+	cfgAddr       = flag.String("config-http-address", "", "The config address")
+	httpAddrCfg   = flag.Bool("config-addresses-as-http", false, "Config nsqlookupd http addresses")
+	checkInterval = flag.Int("check-interval", 15, "Time interval for checks/update")
 )
 
 func main() {
@@ -69,7 +70,7 @@ func main() {
 
 // continue looking at dns entry for changes in config
 func configLoop(ctx log.Interface, cfgURL string) {
-	ticker := time.Tick(15 * time.Second)
+	ticker := time.Tick(time.Duration(*checkInterval) * time.Second)
 
 	for {
 		select {
